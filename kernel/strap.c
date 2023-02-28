@@ -80,13 +80,21 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
 //
 // implements round-robin scheduling. added @lab3_3
 //
-void rrsched() {
+void rrsched()
+{
   // TODO (lab3_3): implements round-robin scheduling.
   // hint: increase the tick_count member of current process by one, if it is bigger than
   // TIME_SLICE_LEN (means it has consumed its time slice), change its status into READY,
   // place it in the rear of ready queue, and finally schedule next process to run.
-  panic( "You need to further implement the timer handling in lab3_3.\n" );
-
+  // panic( "You need to further implement the timer handling in lab3_3.\n" );
+  current->tick_count++;
+  if (current->tick_count >= TIME_SLICE_LEN)
+  {
+    current->tick_count = 0;
+    current->status = READY;
+    insert_to_ready_queue(current);
+    schedule();
+  }
 }
 
 //
@@ -110,27 +118,27 @@ void smode_trap_handler(void)
 
   // use switch-case instead of if-else, as there are many cases since lab2_3.
 
-  switch (cause) {
-    case CAUSE_USER_ECALL:
-      handle_syscall(current->trapframe);
-      break;
-    case CAUSE_MTIMER_S_TRAP:
-      handle_mtimer_trap();
-      // invoke round-robin scheduler. added @lab3_3
-      rrsched();
-      break;
-    case CAUSE_STORE_PAGE_FAULT:
-    case CAUSE_LOAD_PAGE_FAULT:
-      // the address of missing page is stored in stval
-      // call handle_user_page_fault to process page faults
-      handle_user_page_fault(cause, read_csr(sepc), read_csr(stval));
-      break;
-    default:
-      sprint("smode_trap_handler(): unexpected scause %p\n", read_csr(scause));
-      sprint("            sepc=%p stval=%p\n", read_csr(sepc), read_csr(stval));
-      panic( "unexpected exception happened.\n" );
-      break;
-
+  switch (cause)
+  {
+  case CAUSE_USER_ECALL:
+    handle_syscall(current->trapframe);
+    break;
+  case CAUSE_MTIMER_S_TRAP:
+    handle_mtimer_trap();
+    // invoke round-robin scheduler. added @lab3_3
+    rrsched();
+    break;
+  case CAUSE_STORE_PAGE_FAULT:
+  case CAUSE_LOAD_PAGE_FAULT:
+    // the address of missing page is stored in stval
+    // call handle_user_page_fault to process page faults
+    handle_user_page_fault(cause, read_csr(sepc), read_csr(stval));
+    break;
+  default:
+    sprint("smode_trap_handler(): unexpected scause %p\n", read_csr(scause));
+    sprint("            sepc=%p stval=%p\n", read_csr(sepc), read_csr(stval));
+    panic("unexpected exception happened.\n");
+    break;
   }
 
   // continue (come back to) the execution of current process.
