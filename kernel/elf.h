@@ -7,7 +7,8 @@
 #define MAX_CMDLINE_ARGS 64
 
 // elf header structure
-typedef struct elf_header_t {
+typedef struct elf_header_t
+{
   uint32 magic;
   uint8 elf[12];
   uint16 type;      /* Object file type */
@@ -26,7 +27,8 @@ typedef struct elf_header_t {
 } elf_header;
 
 // Program segment header.
-typedef struct elf_prog_header_t {
+typedef struct elf_prog_header_t
+{
   uint32 type;   /* Segment type */
   uint32 flags;  /* Segment flags */
   uint64 off;    /* Segment file offset */
@@ -37,10 +39,35 @@ typedef struct elf_prog_header_t {
   uint64 align;  /* Segment alignment */
 } elf_prog_header;
 
-#define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+typedef struct elf_sec_header_t
+{
+  uint32 name;
+  uint32 type;
+  uint64 flags;
+  uint64 addr;
+  uint64 offset;
+  uint64 size;
+  uint32 link;
+  uint32 info;
+  uint64 align;
+  uint64 entsize;
+} elf_sec_header;
+
+typedef struct
+{
+  uint32 st_name;
+  unsigned char st_info;
+  unsigned char st_other;
+  uint16 st_shndx;
+  uint64 st_value;
+  uint64 st_size;
+} Elf_symtab;
+
+#define ELF_MAGIC 0x464C457FU // "\x7FELF" in little endian
 #define ELF_PROG_LOAD 1
 
-typedef enum elf_status_t {
+typedef enum elf_status_t
+{
   EL_OK = 0,
 
   EL_EIO,
@@ -50,7 +77,8 @@ typedef enum elf_status_t {
 
 } elf_status;
 
-typedef struct elf_ctx_t {
+typedef struct elf_ctx_t
+{
   void *info;
   elf_header ehdr;
 } elf_ctx;
@@ -59,5 +87,6 @@ elf_status elf_init(elf_ctx *ctx, void *info);
 elf_status elf_load(elf_ctx *ctx);
 
 void load_bincode_from_host_elf(process *p);
+uint64 load_funtion_list();
 
 #endif
