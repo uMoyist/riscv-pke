@@ -16,6 +16,7 @@
 //
 // handling the syscalls. will call do_syscall() defined in kernel/syscall.c
 //
+uint64 user_stack_bottom = USER_STACK_TOP - PGSIZE;
 static void handle_syscall(trapframe *tf)
 {
   // tf->epc points to the address that our computer will jump to after the trap handling.
@@ -65,13 +66,19 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     // hint: first allocate a new physical page, and then, maps the new page to the
     // virtual address that causes the page fault.
     // panic( "You need to implement the operations that actually handle the page fault in lab2_3.\n" );
-    new_page = alloc_page();
-    memset(new_page, 0, PGSIZE);
-
-    map_pages((pagetable_t)current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, (uint64)new_page, prot_to_type(PROT_WRITE | PROT_READ, 1));
+    if (stval < user_stack_bottom && stval > user_stack_bottom - PGSIZE)
+    {
+      new_page = alloc_page();
+      memset(new_page, 0, PGSIZE);
+      map_pages((pagetable_t)current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, (uint64)new_page, prot_to_type(PROT_WRITE | PROT_READ, 1));
+      user_stack_bottom -= PGSIZE;
+    }
+    else if (stval >= g_ufree_page)
+      panic("this address is not available!");
     break;
   default:
     sprint("unknown page fault.\n");
+
     break;
   }
 }
