@@ -187,6 +187,7 @@ int do_fork(process *parent)
     {
     case CONTEXT_SEGMENT:
       *child->trapframe = *parent->trapframe;
+      // procs[i].mapped_info[1].va = (uint64)procs[i].trapframe;
       break;
     case STACK_SEGMENT:
       memcpy((void *)lookup_pa(child->pagetable, child->mapped_info[0].va),
