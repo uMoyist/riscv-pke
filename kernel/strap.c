@@ -68,7 +68,7 @@ void handle_user_page_fault(uint64 mcause, uint64 sepc, uint64 stval)
     // panic( "You need to implement the operations that actually handle the page fault in lab2_3.\n" );
     new_page = alloc_page();
     memset(new_page, 0, PGSIZE);
-
+    // map_pages((pagetable_t)current->pagetable, USER_STACK_TOP - cnt * PGSIZE, PGSIZE, (uint64)new_page, prot_to_type(PROT_WRITE | PROT_READ, 1));
     map_pages((pagetable_t)current->pagetable, ROUNDDOWN(stval, PGSIZE), PGSIZE, (uint64)new_page, prot_to_type(PROT_WRITE | PROT_READ, 1));
     break;
   default:
