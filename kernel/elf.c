@@ -280,8 +280,37 @@ void load_bincode_from_host_elf(process *p) {
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
 
+  elf_sect_header elf_sh;
+
+  uint64 off = elfloader.ehdr.shoff + elfloader.ehdr.shstrndx * sizeof(elf_sh);
+  elf_fpread(&elfloader, (void *)&elf_sh, sizeof(elf_sh), off);
+
+
+  char elf_shstrtab[elf_sh.size];
+
+  elf_fpread(&elfloader, elf_shstrtab, elf_sh.size, elf_sh.offset);
+
+
+  uint64 debug_line_size = 64 * 16;
+  char elf_debug_line[debug_line_size];
+
+
+  for (int i = 0, off = elfloader.ehdr.shoff; i < elfloader.ehdr.shnum; i++, off += sizeof(elf_sh))
+  {
+      elf_fpread(&elfloader, (void *)&elf_sh, sizeof(elf_sh), off) != sizeof(elf_sh);
+
+
+      if (!strcmp(elf_shstrtab + elf_sh.name, ".debug_line"))
+      {
+
+        elf_fpread(&elfloader, (void *)elf_debug_line, debug_line_size, elf_sh.offset);
+        make_addr_line(&elfloader, elf_debug_line, elf_sh.size);  
+      }
+  }
+  
+
   // close the host spike file
-  spike_file_close( info.f );
+  spike_file_close(info.f);
 
   sprint("Application program entry point (virtual address): 0x%lx\n", p->trapframe->epc);
 }
