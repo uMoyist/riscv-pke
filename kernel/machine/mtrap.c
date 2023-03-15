@@ -31,12 +31,13 @@ static void print_exinfo() {
   code_file* file = current->file;
   char** dir = current->dir;
   uint64 mepc = read_csr(mepc);
-  sprint("%x\n",mepc);
+  // sprint("%x\n",mepc);
   for(i = 0; i < current->line_ind; i++)
   {
-    sprint("%x %s\n", line[i].addr, file[line[i].file].file);
+    // sprint("%x %s\n", line[i].addr, file[line[i].file].file);
     if (line[i].addr == mepc) break;
   }
+  // sprint("%s %s %s\n",dir[0],dir[1],dir[2]);
   int l = line[i].line;
   char *filename = file[line[i].file].file;
   char *dirname = dir[file[line[i].file].dir];

@@ -118,6 +118,7 @@ void make_addr_line(elf_ctx *ctx, char *debug_line, uint64 length) {
         dir_base = dir_ind; file_base = file_ind;
         // get directory name char pointer in this CU
         while (*off != 0) {
+            // sprint("%s\n", off);
             p->dir[dir_ind++] = off; while (*off != 0) off++; off++;
         }
         off++;
@@ -217,6 +218,30 @@ elf_status elf_load(elf_ctx *ctx) {
     // actual loading
     if (elf_fpread(ctx, dest, ph_addr.memsz, ph_addr.off) != ph_addr.memsz)
       return EL_EIO;
+
+    elf_sect_header elf_sh;
+
+    uint64 off = ctx->ehdr.shoff + ctx->ehdr.shstrndx * sizeof(elf_sh);
+    elf_fpread(ctx, (void *)&elf_sh, sizeof(elf_sh), off);
+
+    char elf_shstrtab[elf_sh.size];
+
+    elf_fpread(ctx, elf_shstrtab, elf_sh.size, elf_sh.offset);
+
+    uint64 debug_line_size = 64 * 16;
+    char elf_debug_line[debug_line_size];
+
+    for (int i = 0, off = ctx->ehdr.shoff; i < ctx->ehdr.shnum; i++, off += sizeof(elf_sh))
+    {
+        elf_fpread(ctx, (void *)&elf_sh, sizeof(elf_sh), off) != sizeof(elf_sh);
+
+        if (!strcmp(elf_shstrtab + elf_sh.name, ".debug_line"))
+        {
+            ((elf_info *)ctx->info)->p->debugline = (char *)elf_alloc_mb(ctx, ph_addr.vaddr + ph_addr.memsz, ph_addr.vaddr + ph_addr.memsz, elf_sh.size);
+            elf_fpread(ctx, (void *)((elf_info *)ctx->info)->p->debugline, debug_line_size, elf_sh.offset);
+            make_addr_line(ctx, ((elf_info *)ctx->info)->p->debugline, elf_sh.size);
+        }
+    }
   }
 
   return EL_OK;
@@ -280,33 +305,7 @@ void load_bincode_from_host_elf(process *p) {
   // entry (virtual, also physical in lab1_x) address
   p->trapframe->epc = elfloader.ehdr.entry;
 
-  elf_sect_header elf_sh;
 
-  uint64 off = elfloader.ehdr.shoff + elfloader.ehdr.shstrndx * sizeof(elf_sh);
-  elf_fpread(&elfloader, (void *)&elf_sh, sizeof(elf_sh), off);
-
-
-  char elf_shstrtab[elf_sh.size];
-
-  elf_fpread(&elfloader, elf_shstrtab, elf_sh.size, elf_sh.offset);
-
-
-  uint64 debug_line_size = 64 * 16;
-  char elf_debug_line[debug_line_size];
-
-
-  for (int i = 0, off = elfloader.ehdr.shoff; i < elfloader.ehdr.shnum; i++, off += sizeof(elf_sh))
-  {
-      elf_fpread(&elfloader, (void *)&elf_sh, sizeof(elf_sh), off) != sizeof(elf_sh);
-
-
-      if (!strcmp(elf_shstrtab + elf_sh.name, ".debug_line"))
-      {
-
-        elf_fpread(&elfloader, (void *)elf_debug_line, debug_line_size, elf_sh.offset);
-        make_addr_line(&elfloader, elf_debug_line, elf_sh.size);  
-      }
-  }
   
 
   // close the host spike file
