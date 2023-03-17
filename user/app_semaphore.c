@@ -20,6 +20,7 @@ int main(void) {
         }
     } else {
         for (int i = 0; i < 10; i++) {
+
             sem_P(main_sem);
             printu("Parent print %d\n", i);
             sem_V(child_sem[0]);

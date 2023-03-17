@@ -19,6 +19,15 @@
 //
 // implement the SYS_user_print syscall
 //
+
+typedef struct sem_node_t {
+  process* p;
+  int num;
+  int used;
+} sem_node;
+
+sem_node sem_array[8];
+
 ssize_t sys_user_print(const char *buf, size_t n)
 {
   // buf is now an address in user space of the given app's user stack,
@@ -90,6 +99,51 @@ ssize_t sys_user_yield()
   return 0;
 }
 
+int sys_user_sem_new(int s)
+{
+  int i = 0;
+  for(i = 0;i<8;i++)
+  {
+    if(sem_array[i].used==0) break;
+  }
+  sem_array[i].used = 1;
+  sem_array[i].num = s;
+  return i;
+}
+
+ssize_t sys_user_semp(int sem)
+{
+  if(sem_array[sem].num>0) {
+    sem_array[sem].num--;
+  }
+  else {
+    sem_array[sem].p = current;
+    current->status = BLOCKED;
+    // sprint("sem blocked %d\n", sem);
+    schedule();
+  }
+  return 0;
+}
+
+ssize_t sys_user_semv(int sem)
+{
+  sem_array[sem].num++;
+  // sprint("sem v %d\n", sem);
+  if (sem_array[sem].num > 0)
+  {
+
+    if (sem_array[sem].p != NULL && sem_array[sem].p->status == BLOCKED)
+    {
+      sem_array[sem].num--;
+      sem_array[sem].p->status = READY;
+      insert_to_ready_queue(sem_array[sem].p);
+      // sprint("sem ready %d\n",sem);
+    }
+  }
+  return 0;
+}
+
+
 //
 // [a0]: the syscall number; [a1] ... [a7]: arguments to the syscalls.
 // returns the code of success, (e.g., 0 means success, fail for otherwise)
@@ -111,6 +165,12 @@ long do_syscall(long a0, long a1, long a2, long a3, long a4, long a5, long a6, l
     return sys_user_fork();
   case SYS_user_yield:
     return sys_user_yield();
+  case SYS_user_sem_new:
+    return sys_user_sem_new(a1);
+  case SYS_user_semp:
+    return sys_user_semp(a1);
+  case SYS_user_semv:
+    return sys_user_semv(a1);
   default:
     panic("Unknown syscall %ld \n", a0);
   }
