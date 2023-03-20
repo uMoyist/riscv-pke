@@ -28,7 +28,7 @@ typedef struct process_t {
   // trapframe storing the context of a (User mode) process.
   trapframe* trapframe;
   // manage the pages allocated
-  char bitmap[128];
+  uint64 bitmap[2];
 }process;
 
 // switch to run user app

@@ -55,99 +55,75 @@ uint64 sys_user_allocate_page()
 
 uint64 sys_user_better_malloc(int n)
 {
-  int i, j, t;
+  if (n == 0)
+    return 0;
+  uint64 *bitmap;
+  ;
+  const uint16 *page_used = (uint16 *)current->bitmap;
+  int size = (n + 8) / 256 + 1; //one byte for size;
+  int i, j;
+  int start = -1;
+  void *pa = 0;
   uint64 va = 0;
-  void *pa;
-  char *bitmap = current->bitmap;
-  n = n/256+1;
-  t = 1;
-  for(i = 0;i<128;i++)
+
+  for (i = 0; i < 128; i++)
   {
-    if (bitmap[i])
-      continue;
-    if(t)
+    if (i < 64)
     {
-      va = USER_FREE_ADDRESS_START + i * 256;
-      t = 0;
+      bitmap = current->bitmap;
+      j = i;
     }
-    if (!(i % 16))
+    else
     {
-      for(j = 0;j<16;j++)
+      bitmap = current->bitmap + 1;
+      j = i - 64;
+    }
+
+    if (!((*bitmap) & (1 << (63 - j))))
+    {
+      if (start == -1)
+        start = i;
+      if (i - start + 1 == size)
+        break; // i = size + start - 1;
+    }
+    else
+      start = -1;
+  }
+  if ((start == -1) || i == 128)
+    return 0;
+  int left = start / 16, right = i / 16;
+  // take it to consideration that repeat the proccess of alloc and free
+  for (j = left; j <= right; j++)
+    if (page_used[j] == 0)
+    {
+      if (g_ufree_page == USER_FREE_ADDRESS_START + j * PGSIZE)
       {
-        // sprint("%d\n", bitmap[j]);
-        if(bitmap[j]) break;
-      }
-      if(j==16){
         pa = alloc_page();
-        // sprint("%x\n", USER_FREE_ADDRESS_START + i * 256);
-        // sprint("0\n");
-        user_vm_map((pagetable_t)current->pagetable, USER_FREE_ADDRESS_START + i * 256, PGSIZE, (uint64)pa,
+        va = g_ufree_page;
+        g_ufree_page += PGSIZE;
+        user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
                     prot_to_type(PROT_WRITE | PROT_READ, 1));
       }
     }
-    bitmap[i] = 1;
-    n--;
-    if(n==0) break;
+
+  for (j = start; j <= i; j++)
+  {
+    if (j < 64)
+    {
+      bitmap = current->bitmap;
+      *bitmap = ((*bitmap) & (1 << (63 - j)));
+    }
+    else
+    {
+      bitmap = current->bitmap + 1;
+      *bitmap = ((*bitmap) & (1 << (127 - j)));
+    }
   }
-  // for (i = 0; i < 8; i++)
-  // {
-  //   t = 0;
-  //   for (j = 0; j < 16; j++)
-  //     if (bitmap[j])
-  //       t++;
-  //   if (t == 0)
-  //   {
-  //     for (j = 0; j < n / 256 + 1; j++)
-  //     {
-  //       bitmap[i * 8 + j] = 1;
-  //       // for (j = 0; j < 16; j++)
-  //       //   sprint("%d", bitmap[i * 8 + j]);
-  //     }
-
-  //     pa = alloc_page();
-  //     va = USER_FREE_ADDRESS_START + i * PGSIZE;
-
-  //     // sprint("0\n");
-  //     user_vm_map((pagetable_t)current->pagetable, va, PGSIZE, (uint64)pa,
-  //                 prot_to_type(PROT_WRITE | PROT_READ, 1));
-  //     break;
-  //   }
-  //   else if (t == 16)
-  //     continue;
-  //   else
-  //   {
-  //     t = -1;
-  //     for (j = 0; j < 16; j++)
-  //     {
-  //       if (bitmap[i * 8 + j] == 0)
-  //       {
-  //         if (t == -1)
-  //           t = j;
-  //         if (j - t + 1 > n / 256)
-  //           break;
-  //       }
-  //       else
-  //         t = -1;
-  //     }
-  //     if (j == 16)
-  //       continue;
-  //     else
-  //     {
-  //       for (j = t; j < t + n / 256 + 1; j++)
-  //       {
-  //         bitmap[i * 8 + j] = 1;
-  //       }
-  //       // for (j = 0; j < 16; j++)
-  //       //   sprint("%d", bitmap[i * 8 + j]);
-  //       // sprint("%d\n", t);
-  //       va = USER_FREE_ADDRESS_START + t * 256;
-  //       // sprint("%x\n", va);
-  //       break;
-  //     }
-  //   }
-  // }
-  // sprint("%x\n", va);
-  return va;
+  va = USER_FREE_ADDRESS_START + start * 256;
+  // sprint("%x, %x, %d, %d, %d\n", va, g_ufree_page, size, start, i);
+  *((uint64 *)(lookup_pa(current->pagetable, va))) = size;
+  // sprint("here\n");
+  return va + 8;
 }
 
 //
@@ -163,24 +139,29 @@ uint64 sys_user_free_page(uint64 va)
 
 uint64 sys_user_better_free(uint64 va)
 {
+
   // sprint("%llx %llx\n",va,USER_FREE_ADDRESS_START);
+  va = va - 8;
   int x = va, y = USER_FREE_ADDRESS_START;
 
-  int i = (x-y) / PGSIZE;
-  int j = (x-y - i * PGSIZE) / 256;
+  int start = (x - y) / 256;
   // sprint("%d %d",i,j);
-  char *bitmap = current->bitmap;
-
-  bitmap[0 * 8 + j] = 0;
-  int t = 0;
-
-  for (j = 0; j < 16; j++)
-    if (bitmap[i * 8 + j])
-      t++;
-  if (t == 0)
+  int size = *(uint64*)(lookup_pa(current->pagetable, va));
+  // sprint("%d\n",size);
+  uint64 *bitmap;
+  int j;
+  for (j = start; j <= start + size - 1; j++)
   {
-    user_vm_unmap((pagetable_t)current->pagetable, va, PGSIZE, 1);
-    // sprint("1\n");
+    if (j < 64)
+    {
+      bitmap = current->bitmap;
+      *bitmap = ((*bitmap) & (~(1 << (63 - j))));
+    }
+    else
+    {
+      bitmap = current->bitmap + 1;
+      *bitmap = ((*bitmap) & (~(1 << (63 - j))));
+    }
   }
   return 0;
 }
